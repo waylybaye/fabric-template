@@ -1,16 +1,29 @@
+import os
 import tempfile
+from fabric.colors import blue
 from fabric.contrib import files
-from wayly_fabric import _info
-from fabric.api import env, put, run, sudo
+from fabric.api import env, put, sudo
 
 
-def config_nginx(name, host):
+_prefix = "/etc/init.d/nginx"
+_conf_prefix = '/etc/nginx/sites-available'
+
+
+def reload():
+    return sudo('%s reload' % _prefix)
+
+
+def start():
+    return sudo('%s start' % _prefix)
+
+
+def stop():
+    return sudo('%s stop' % _prefix)
+
+
+def config(name, host, proxy):
     """Config nginx to route requests to wsgi process"""
     template = """
-upstream %(app)s_server {
-    server unix:/home/%(user)s/run/%(app)s.sock fail_timeout=0;
-}
-
 server {
     listen 80 default;
     client_max_body_size 4G;
@@ -31,7 +44,7 @@ server {
         proxy_set_header Host $http_host;
         proxy_redirect off;
 
-        proxy_pass   http://%(app)s_server;
+        proxy_pass %(proxy)s;
     }
 
     access_log /var/log/nginx/%(app)s.access.log;
@@ -39,21 +52,37 @@ server {
 }
     """
     config = template % {
-        'user': env.user,
         'app': name,
+        'user': env.user,
         'host': host,
+        'proxy': proxy,
     }
+
     local_path = tempfile.mktemp('.conf')
     with open(local_path, 'w+') as output:
         output.write(config)
 
     remote_path = "/etc/nginx/sites-available/%s.conf" % name
     link_path = "/etc/nginx/sites-enabled/%s.conf" % name
-    _info("Creating nginx config file under sites-available ... \n")
+    print blue("Creating nginx config file under sites-available ... \n")
     put(local_path, remote_path, use_sudo=True)
-    _info('Linking nginx config file to sites-enabled ... \n')
+
+    print blue('Linking nginx config file to sites-enabled ... \n')
     if files.exists(link_path):
         sudo('rm %s' % link_path)
     sudo('ln -s %s %s' % (remote_path, link_path))
-    _info("Restarting nginx ... \n")
+
+    print blue("Restarting nginx ... \n")
     sudo('service nginx reload')
+
+
+def delete(name):
+    """Delete nginx config"""
+    config_files= [
+        os.path.join(_conf_prefix, '%s.conf' % name),
+        '/etc/nginx/sites-enabled/%s.conf' % name,
+    ]
+
+    for file_path in config_files:
+        if files.exists(file_path):
+            sudo('rm %s' % file_path)

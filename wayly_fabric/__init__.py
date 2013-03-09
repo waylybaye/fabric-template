@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 from fabric.api import run, sudo, get, env as _env
@@ -6,16 +7,23 @@ from fabric.contrib import files
 from fabric.context_managers import cd, prefix, hide
 from fabric.contrib.console import confirm
 from fabric.utils import fastprint
-from wayly_fabric.supervisor import config_supervisor, _supervisor_status
+
+import supervisor
+import nginx
+
+from wayly_fabric.supervisor import _supervisor_status
+
+
+__version__ = "0.1.dev1"
 
 
 def _success(msg=""):
     print green(msg or "success")
 
 
-def _info(msg, new_line=False):
-    if new_line:
-        print blue(msg)
+def _info(msg):
+    if not msg.endswith('\n'):
+        msg += "\n"
     fastprint(blue(msg))
 
 
@@ -24,7 +32,7 @@ def _error(msg):
 
 
 def _app_paths(name):
-    return "/home/%s/www/%s" % (_env.user, name), "/home/%s/env/%s" % (_env.user, name)
+    return "/home/%s/www/%s" % (_env.user, name), "/home/%s/.virtualenvs/%s" % (_env.user, name)
 
 
 def _find_main_dir():
@@ -45,6 +53,23 @@ def _mkdir(folders):
             run('mkdir %s' % folder)
 
 
+def _get_app_config():
+    app_config = tempfile.mktemp('.json')
+    remote_config = '/home/%s/.app/app.json' % _env.user
+
+    config = {}
+    if files.exists(remote_config):
+        _download_remote_file(remote_config, app_config)
+        config = json.load(open(app_config))
+
+    return config
+
+
+def _write_app_config(config):
+    local_cache = tempfile.mktemp('.json')
+    json.dump(config, open(local_cache, 'w'))
+
+
 def create_app(name=None, git=None):
     """
     Create an app in remote server
@@ -53,39 +78,36 @@ def create_app(name=None, git=None):
         ~/env/app
         ~/run/app.sock
     """
-    _info("--------- Initialize App ----------\n")
-
+    # install essential packages: python-setuptools
     install_essentials()
 
-    _info("creating folders ... \n")
-    # create ~/www directory if not existing
+    env_bas_dir = '/home/%s/.virtualenvs' % _env.user
+
+    # create ~/www directory if not exists
     project_root = '~/www/%s' % name
     if files.exists(project_root):
-        raise Exception("the app is already existed.")
+        print red("The app is already existed.")
+        return
 
     # create base dirs
-    _mkdir(['~/run', '~/env', '~/www', '~/log'])
+    _mkdir([env_bas_dir, '~/www', '~/log'])
 
-    # change the owner so the gunicorn worker could access it
-    sudo('chown www-data:www-data ~/run')
+    home = "/home/%s" % _env.user
 
     with hide('running', 'stdout'):
         with cd("~/www"):
-            _info("clone git repo ...  \n"),
+            _info("git clone %s %s/www/%s ...  \n" % (git, home, name)),
             run('git clone %s %s' % (git, name))
 
-        with cd("~/env"):
-            _info("create virutalenv ... "),
+        with cd(env_bas_dir):
+            _info("create virutalenv %s/%s ... " % (env_bas_dir, name)),
             run("virtualenv %s" % name)
-            _success("success")
 
-        with prefix('source ~/env/%s/bin/activate' % name):
-            _info("installing gunicorn ... "),
+        with prefix('source %s/%s/bin/activate' % (env_bas_dir, name)):
+            _info("install gunicorn ... "),
             run('pip install gunicorn')
-            _success("success")
 
-    config_supervisor(name)
-    start(name)
+    install_requirements(name)
 
 
 def _is_package_installed(executable):
@@ -140,6 +162,9 @@ def _download_remote_file(remote_path, local_path="", hide_message=False):
 
 
 def install_requirements(name):
+    """
+    run `pip install -r requirements`
+    """
     project_root, env = _app_paths(name)
     if files.exists(os.path.join(project_root, 'requirements.txt')):
         with cd(project_root), prefix('source %s/bin/activate' % env):
@@ -148,26 +173,18 @@ def install_requirements(name):
 
 
 def delete_app(name=None):
+    """"""
     project_root = '~/www/%s' % name
     if not files.exists(project_root):
-        raise Exception("the app is not existing.")
+        print red("the app is not existing.")
+        return
 
     if confirm('Are you sure to delete this app( all files will be deleted )?', default=False):
         _info("Delete source files and virtual env ... \n")
         run("rm -rf %s" % project_root)
         run("rm -rf ~/env/%s" % name)
 
-        supervisor_config = '/etc/supervisor/conf.d/%s.conf' % name
-        if files.exists(supervisor_config):
-            _info("Delete supervisor config file ... \n")
-            sudo('rm %s' % supervisor_config)
-            sudo('supervisorctl update')
 
-        nginx_config = '/etc/nginx/sites-available/%s.conf' % name
-        if files.exists(nginx_config):
-            _info("Delete nginx config file ... \n")
-            sudo('rm %s' % nginx_config)
-            sudo('service nginx reload')
 
 
 def deploy(name):
@@ -179,6 +196,8 @@ def deploy(name):
         run('git pull')
 
     with cd(project_root), prefix('source %s/bin/activate' % env), hide('running'):
+        install_requirements(name)
+
         # initialize the database
         _info("./manage.py syncdb ... \n")
         run('python manage.py syncdb')
@@ -197,7 +216,6 @@ def start(name):
     """
     Start the wsgi process
     """
-    project_root, env = _app_paths(name)
     if _supervisor_status(name).lower() == 'running':
         _error("The app wsgi process is already started.")
         return
