@@ -45,15 +45,17 @@ server {
     access_log /var/log/nginx/%(app)s.access.log;
     error_log /var/log/nginx/%(app)s.error.log;
 }
-    """
+"""
     extra = ""
     if static_dir:
-        url = static_dir.rstrip('/').rsplit('/', 1)[1]
-        extra += "    location /%s/ { alias %s; }" % (url, static_dir)
+        static_dir = static_dir.rstrip('/')
+        url = static_dir.rsplit('/', 1)[1]
+        extra += "    location /%s/ { alias %s/; }\n" % (url, static_dir)
 
     if media_dir:
-        url = media_dir.rstrip('/').rsplit('/', 1)[1]
-        extra += "    location /%s/ { alias %s; }" % (url, static_dir)
+        media_dir = media_dir.rstrip('/')
+        url = media_dir.rsplit('/', 1)[1]
+        extra += "    location /%s/ { alias %s/; }\n" % (url, media_dir)
 
     config = template % {
         'app': name,
