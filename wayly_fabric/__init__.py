@@ -4,7 +4,7 @@ import tempfile
 from fabric.api import run, sudo, get, env as _env
 from fabric.colors import green, blue, red
 from fabric.contrib import files
-from fabric.context_managers import cd, prefix, hide
+from fabric.context_managers import cd, prefix, hide, shell_env
 from fabric.contrib.console import confirm
 from fabric.utils import fastprint
 
@@ -189,7 +189,9 @@ def deploy(name):
     with cd(project_root):
         run('git pull')
 
-    with cd(project_root), prefix('source %s/bin/activate' % env), hide('running'):
+    environ = supervisor._get_environment(name)
+
+    with cd(project_root), prefix('source %s/bin/activate' % env), hide('running'), shell_env(**environ):
         install_requirements(name)
 
         # initialize the database
@@ -203,36 +205,7 @@ def deploy(name):
         # collect static files
         _info("./manage.py collectstatic --noinput ... \n")
         run('python manage.py collectstatic --noinput')
-        start(name)
-
-
-def start(name):
-    """
-    Start the wsgi process
-    """
-    if _supervisor_status(name).lower() == 'running':
-        _error("The app wsgi process is already started.")
-        return
-
-    _info("Starting the app wsgi process ... \n")
-    sudo('supervisorctl start %s' % name)
-
-    # check if the wsgi process started
-    if _supervisor_status(name).lower() == 'running':
-        _success()
-
-
-def stop(name):
-    """Stop the wsgi process"""
-    if _supervisor_status(name).lower() != 'running':
-        _error("The app wsgi process is not running.")
-        return
-
-    _info("Stop the app wsgi process ... \n")
-    sudo('supervisorctl stop %s' % name)
-
-    if _supervisor_status(name).lower() == 'stopped':
-        _success()
+        supervisor.restart(name)
 
 
 def status(name=""):
