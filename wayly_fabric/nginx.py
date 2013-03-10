@@ -21,7 +21,7 @@ def stop():
     return sudo('%s stop' % _prefix)
 
 
-def config(name, host, proxy):
+def config(name, host, proxy, static_dir=None, media_dir=None):
     """Config nginx to route requests to wsgi process"""
     template = """
 server {
@@ -31,15 +31,10 @@ server {
 
     keepalive_timeout 5;
 
-    # path for static files
-    # root /path/to/app/current/public;
+
+    %(extra)s
 
     location / {
-        # checks for static file, if not found proxy to app
-        try_files $uri @proxy_to_app;
-    }
-
-    location @proxy_to_app {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header Host $http_host;
         proxy_redirect off;
@@ -51,11 +46,21 @@ server {
     error_log /var/log/nginx/%(app)s.error.log;
 }
     """
+    extra = ""
+    if static_dir:
+        url = static_dir.rstrip('/').rsplit('/', 1)[1]
+        extra += "    location /%s/ { alias %s; }" % (url, static_dir)
+
+    if media_dir:
+        url = media_dir.rstrip('/').rsplit('/', 1)[1]
+        extra += "    location /%s/ { alias %s; }" % (url, static_dir)
+
     config = template % {
         'app': name,
         'user': env.user,
         'host': host,
         'proxy': proxy,
+        'extra': extra,
     }
 
     local_path = tempfile.mktemp('.conf')
