@@ -56,6 +56,9 @@ def config(name, command, virtualenv, **kwargs):
 
 
 def _get_environment(name):
+    """
+    Get user custom environment variables
+    """
     remote_path = '/etc/supervisor/conf.d/%s.conf' % name
     local_path = tempfile.mktemp(".conf")
     get(remote_path, local_path)
@@ -80,12 +83,15 @@ def _get_environment(name):
 
 
 def _set_environment(name, **kwargs):
+    """
+    set user custom environment variables
+    """
     remote_path = '/etc/supervisor/conf.d/%s.conf' % name
     local_path = tempfile.mktemp(".conf")
     get(remote_path, local_path)
 
     parser = ConfigParser()
-
+    parser.read(local_path)
     section = 'program:%s' % name
     parser.set(section, 'environment', ','.join(['%s="%s"' % (k, v) for k, v in kwargs.iteritems()]))
     parser.write(open(local_path, 'w'))
