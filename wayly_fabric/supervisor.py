@@ -114,3 +114,12 @@ def delete(name):
         print blue("Delete supervisor config file ... \n")
         sudo('rm %s' % supervisor_config)
         sudo('supervisorctl update')
+
+
+def log(name):
+    """show the app wsgi process log"""
+    print blue("Getting log for %s" % name)
+    with hide('running', 'stdout'):
+        msg = sudo('supervisorctl tail %s' % name)
+        print msg
+

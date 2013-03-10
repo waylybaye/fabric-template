@@ -122,29 +122,25 @@ def install_essentials():
     """
     _info("Installing essential packages ... \n")
 
+    if not _is_package_installed('gcc'):
+        print blue("Installing build-essential")
+        sudo('apt-get install build-essential')
+
     if not _is_package_installed("easy_install"):
-        with hide('running', 'stdout'):
-            print blue("Installing python-setuptools ... "),
-            sudo("apt-get install python-setuptools")
-            print green("success")
+        print blue("Installing python-setuptools ... "),
+        sudo("apt-get install python-setuptools")
 
     if not _is_package_installed("supervisorctl"):
-        with hide('running', 'stdout'):
-            print blue("Installing supervisor ... "),
-            sudo('easy_install supervisor')
-            print green('success')
+        print blue("Installing supervisor ... "),
+        sudo('easy_install supervisor')
 
     if not _is_package_installed("virtualenv"):
-        with hide('running', 'stdout'):
-            _info("Installing virtualenv ... "),
-            sudo('easy_install virtualenv')
-            _success("success")
+        _info("Installing virtualenv ... "),
+        sudo('easy_install virtualenv')
 
     if not _is_package_installed("git"):
-        with hide('running', 'stdout'):
-            print blue('Installing git ... '),
-            sudo('apt-get install git')
-            print green('success')
+        print blue('Installing git ... '),
+        sudo('apt-get install git')
 
 
 def _download_remote_file(remote_path, local_path="", hide_message=False):
@@ -183,8 +179,6 @@ def delete_app(name=None):
         _info("Delete source files and virtual env ... \n")
         run("rm -rf %s" % project_root)
         run("rm -rf ~/env/%s" % name)
-
-
 
 
 def deploy(name):
@@ -258,13 +252,6 @@ def status(name=""):
 
         print blue('gunicorn :'), gunicorn_status, extra_msg
 
-
-def log(name):
-    """show the app wsgi process log"""
-    _info("Getting log for %s\n" % name)
-    with hide('running', 'stdout'):
-        msg = sudo('supervisorctl tail %s' % name)
-        print msg
 
 
 def hello():
