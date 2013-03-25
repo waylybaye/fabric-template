@@ -11,7 +11,7 @@ from fabric.utils import fastprint
 import supervisor
 import nginx
 
-from wayly_fabric.supervisor import _supervisor_status
+from fabric_template.supervisor import _supervisor_status
 
 
 __version__ = "0.1.dev1"
