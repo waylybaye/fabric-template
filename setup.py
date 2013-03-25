@@ -14,5 +14,6 @@ setup(
     license='MIT',
     author='waylybaye',
     author_email='waylybaye@wayly.net',
-    description='A resuable django deploy fabfile'
+    description='A resuable django deploy fabfile',
+    install_requires=['fabric>=1.6.0'],
 )

@@ -97,7 +97,7 @@ def create_app(name=None, git=None):
     with hide('running', 'stdout'):
         with cd("~/www"):
             _info("git clone %s %s/www/%s ...  \n" % (git, home, name)),
-            run('git clone %s %s' % (git, name))
+            run('git clone %s %s' % (git, name), pty=False)
 
         with cd(env_bas_dir):
             _info("create virutalenv %s/%s ... " % (env_bas_dir, name)),
@@ -187,7 +187,7 @@ def deploy(name):
     """
     project_root, env = _app_paths(name)
     with cd(project_root):
-        run('git pull')
+        run('git pull', pty=False)
 
     environ = supervisor._get_environment(name)
 
@@ -229,4 +229,3 @@ def status(name=""):
 
 def hello():
     run("echo Hello")
-
