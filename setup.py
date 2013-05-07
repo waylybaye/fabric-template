@@ -1,15 +1,11 @@
-try:
-    from setuptools import setup
-except ImportError:
-    from distutils.core import setup
-
+from setuptools import setup, find_packages
 
 version = __import__('fabric_template').__version__
 
 setup(
     name='fabric-template',
     version=version,
-    packages=['fabric_template'],
+    packages=find_packages(),
     url='https://github.com/waylybaye/fabric-template',
     license='MIT',
     author='waylybaye',
